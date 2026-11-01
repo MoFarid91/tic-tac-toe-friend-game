@@ -154,7 +154,7 @@
           </div>
         </div>
       </section>
-      <p class="help" id="help">Create a game and share the invite link with your friend. They join as O; you play as X. Both players need an internet connection.</p>
+      <p class="help" id="help">Create a game and share the invite link with your friend. Keep your game tab open while they join. Both players need an internet connection.</p>
       <p class="footer">Made for friendly rivalries <span>✳</span></p>
     </main>
 
@@ -178,6 +178,7 @@
         ];
         let peer;
         let connection;
+        let connectionTimeout;
         let isHost = false;
         let myMark = null;
         let game = { board: Array(9).fill(""), turn: "X", winner: null, winningLine: [] };
@@ -271,13 +272,20 @@
         function attachConnection(nextConnection, host) {
           connection = nextConnection;
           isHost = host;
+          window.clearTimeout(connectionTimeout);
+          connectionTimeout = window.setTimeout(() => {
+            if (!connection?.open) {
+              setStatus("Connection timed out. Ask your friend to keep their game open and send a fresh invite. Some networks block direct connections.", "bad");
+            }
+          }, 20000);
           connection.on("open", () => {
+            window.clearTimeout(connectionTimeout);
             hostButton.hidden = true;
             restartButton.hidden = false;
             leaveButton.hidden = false;
             invite.classList.toggle("visible", isHost);
             help.textContent = isHost
-              ? "You are X. Share the invite link above; your friend joins as O."
+              ? "You are X. Keep this tab open while playing. Share the invite link above; your friend joins as O."
               : "You joined as O. You can play when it is your turn.";
             setStatus("Connected! X goes first.", "good");
             if (isHost) broadcastState();
@@ -285,6 +293,7 @@
           });
           connection.on("data", handleMessage);
           connection.on("close", () => {
+            window.clearTimeout(connectionTimeout);
             connection = null;
             render();
             setStatus("Your friend disconnected. Create a new game to play again.", "bad");
@@ -293,7 +302,7 @@
           });
           connection.on("error", error => {
             console.error("Game connection error.", error);
-            setStatus("Connection interrupted. Check your internet and try again.", "bad");
+            setStatus("Connection interrupted. Check both players' internet connections and try a fresh invite.", "bad");
           });
         }
 
@@ -302,6 +311,7 @@
           peer?.destroy();
           connection = null;
           peer = null;
+          window.clearTimeout(connectionTimeout);
           isHost = false;
           myMark = null;
           game = { board: Array(9).fill(""), turn: "X", winner: null, winningLine: [] };
@@ -310,7 +320,7 @@
           hostButton.hidden = false;
           restartButton.hidden = true;
           leaveButton.hidden = true;
-          help.textContent = "Create a game and share the invite link with your friend. They join as O; you play as X. Both players need an internet connection.";
+          help.textContent = "Create a game and share the invite link with your friend. Keep your game tab open while they join. Both players need an internet connection.";
           setStatus("Start a game or join a friend's invite.");
           render();
         }
