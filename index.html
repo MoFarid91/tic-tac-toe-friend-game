@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111312">
+    <meta name="description" content="Challenge a friend to a game of Tic-Tac-Toe online.">
+    <title>Tic-Tac-Toe Club — Play a friend online</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111312;
+        --surface: #191c1a;
+        --line: #343a34;
+        --text: #f0f0e9;
+        --muted: #a0a49a;
+        --accent: #c5f36a;
+        --pink: #f0a8a0;
+        font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 28px 18px;
+        background:
+          radial-gradient(ellipse at 50% 0%, #293126 0%, transparent 48%),
+          var(--bg);
+        color: var(--text);
+      }
+      button, input { font: inherit; }
+      button { color: inherit; }
+      .game { width: min(100%, 520px); }
+      .topline {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 36px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+      .brand { color: var(--text); font-weight: 700; letter-spacing: -.03em; text-transform: none; }
+      .brand span { color: var(--accent); }
+      .online-indicator { display: flex; align-items: center; gap: 8px; }
+      .online-indicator::before { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); content: ""; }
+      h1 { margin: 0; font-size: clamp(42px, 11vw, 66px); line-height: .98; letter-spacing: -.075em; }
+      h1 span { color: var(--accent); }
+      .intro { margin: 15px 0 27px; color: var(--muted); font-size: 14px; line-height: 1.65; }
+      .panel { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: #191c1ae8; }
+      .status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; margin-bottom: 17px; }
+      #status { margin: 0; color: var(--muted); font-size: 13px; }
+      #status[data-kind="good"] { color: var(--accent); }
+      #status[data-kind="bad"] { color: var(--pink); }
+      .score { color: var(--muted); font-size: 11px; white-space: nowrap; }
+      .score strong { color: var(--text); font-weight: 600; }
+      .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+      .cell {
+        display: grid;
+        aspect-ratio: 1;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #222622;
+        color: var(--text);
+        font-size: clamp(43px, 14vw, 74px);
+        font-weight: 600;
+        line-height: 1;
+        cursor: pointer;
+        transition: border-color .16s, background .16s, transform .16s;
+      }
+      .cell:not(:disabled):hover { transform: translateY(-2px); border-color: #70834e; background: #292f27; }
+      .cell:disabled { cursor: default; }
+      .cell.mark-x { color: var(--accent); }
+      .cell.mark-o { color: var(--pink); }
+      .cell.winner { border-color: var(--accent); background: #2a3423; }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+      .button {
+        min-height: 43px;
+        padding: 0 15px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: transparent;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: border-color .15s, background .15s, color .15s;
+      }
+      .button:hover:not(:disabled) { border-color: #78806d; }
+      .button:disabled { opacity: .48; cursor: not-allowed; }
+      .button.primary { border-color: var(--accent); background: var(--accent); color: #172012; }
+      .button.primary:hover:not(:disabled) { background: #d6ff87; }
+      .invite { display: none; margin-top: 13px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #141614; }
+      .invite.visible { display: block; }
+      .invite label { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11px; }
+      .invite-row { display: flex; gap: 8px; }
+      .invite input { width: 100%; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 7px; outline: none; background: var(--surface); color: var(--text); font-size: 11px; }
+      .invite input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+      .invite .button { min-height: 38px; padding-inline: 12px; }
+      .help { margin: 17px 2px 0; color: #858a80; font-size: 11px; line-height: 1.6; }
+      .footer { margin-top: 27px; color: #777d73; font-size: 10px; text-align: center; }
+      .footer span { color: var(--accent); }
+      @media (max-width: 420px) {
+        .panel { padding: 15px; }
+        .topline { margin-bottom: 29px; }
+        .status-row { align-items: flex-start; flex-direction: column; gap: 7px; }
+        .cell { border-radius: 9px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+      }
+    </style>
+    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+  </head>
+  <body>
+    <main class="game">
+      <div class="topline">
+        <div class="brand">little games<span>.</span></div>
+        <div class="online-indicator">online edition</div>
+      </div>
+      <h1>Tic-Tac-Toe<span>.</span></h1>
+      <p class="intro">A tiny game for two. Invite a friend, take turns, and see who gets three in a row.</p>
+
+      <section class="panel" aria-label="Tic-Tac-Toe game">
+        <div class="status-row">
+          <p id="status" role="status" aria-live="polite">Start a game or join a friend's invite.</p>
+          <div class="score" id="score" aria-live="polite"></div>
+        </div>
+        <div class="board" role="grid" aria-label="Tic-Tac-Toe board">
+          <button class="cell" type="button" role="gridcell" data-index="0" aria-label="Empty square, row 1 column 1"></button>
+          <button class="cell" type="button" role="gridcell" data-index="1" aria-label="Empty square, row 1 column 2"></button>
+          <button class="cell" type="button" role="gridcell" data-index="2" aria-label="Empty square, row 1 column 3"></button>
+          <button class="cell" type="button" role="gridcell" data-index="3" aria-label="Empty square, row 2 column 1"></button>
+          <button class="cell" type="button" role="gridcell" data-index="4" aria-label="Empty square, row 2 column 2"></button>
+          <button class="cell" type="button" role="gridcell" data-index="5" aria-label="Empty square, row 2 column 3"></button>
+          <button class="cell" type="button" role="gridcell" data-index="6" aria-label="Empty square, row 3 column 1"></button>
+          <button class="cell" type="button" role="gridcell" data-index="7" aria-label="Empty square, row 3 column 2"></button>
+          <button class="cell" type="button" role="gridcell" data-index="8" aria-label="Empty square, row 3 column 3"></button>
+        </div>
+        <div class="actions">
+          <button class="button primary" id="host-button" type="button">Create a game</button>
+          <button class="button" id="restart-button" type="button" hidden>Play again</button>
+          <button class="button" id="leave-button" type="button" hidden>Leave game</button>
+        </div>
+        <div class="invite" id="invite">
+          <label for="invite-link">Send this invite link to your friend</label>
+          <div class="invite-row">
+            <input id="invite-link" type="text" readonly aria-label="Game invite link">
+            <button class="button" id="copy-button" type="button">Copy link</button>
+          </div>
+        </div>
+      </section>
+      <p class="help" id="help">First publish this file on a public HTTPS site so your friend can open it. Then create a game and share its invite link. Both players need an internet connection.</p>
+      <p class="footer">Made for friendly rivalries <span>✳</span></p>
+    </main>
+
+    <script>
+      (() => {
+        const status = document.querySelector("#status");
+        const boardElement = document.querySelector(".board");
+        const cells = [...document.querySelectorAll(".cell")];
+        const hostButton = document.querySelector("#host-button");
+        const restartButton = document.querySelector("#restart-button");
+        const leaveButton = document.querySelector("#leave-button");
+        const invite = document.querySelector("#invite");
+        const inviteLink = document.querySelector("#invite-link");
+        const copyButton = document.querySelector("#copy-button");
+        const scoreElement = document.querySelector("#score");
+        const help = document.querySelector("#help");
+        const winningLines = [
+          [0, 1, 2], [3, 4, 5], [6, 7, 8],
+          [0, 3, 6], [1, 4, 7], [2, 5, 8],
+          [0, 4, 8], [2, 4, 6]
+        ];
+        let peer;
+        let connection;
+        let isHost = false;
+        let myMark = null;
+        let game = { board: Array(9).fill(""), turn: "X", winner: null, winningLine: [] };
+        let scores = { X: 0, O: 0 };
+
+        function setStatus(message, kind = "") {
+          status.textContent = message;
+          status.dataset.kind = kind;
+        }
+
+        function render() {
+          cells.forEach((cell, index) => {
+            const mark = game.board[index];
+            cell.textContent = mark;
+            cell.classList.toggle("mark-x", mark === "X");
+            cell.classList.toggle("mark-o", mark === "O");
+            cell.classList.toggle("winner", game.winningLine.includes(index));
+            const row = Math.floor(index / 3) + 1;
+            const column = index % 3 + 1;
+            cell.setAttribute("aria-label", mark
+              ? `${mark}, row ${row} column ${column}`
+              : `Empty square, row ${row} column ${column}`);
+            cell.disabled = !connection?.open || Boolean(game.winner) ||
+              Boolean(game.board[index]) || game.turn !== myMark;
+          });
+          scoreElement.textContent = connection?.open
+            ? `You: ${myMark}  ·  Score  ${scores.X} – ${scores.O}`
+            : "";
+        }
+
+        function receiveState(nextGame, nextScores) {
+          if (!nextGame || !Array.isArray(nextGame.board) || nextGame.board.length !== 9 ||
+              !nextGame.board.every(mark => mark === "" || mark === "X" || mark === "O") ||
+              !["X", "O"].includes(nextGame.turn) ||
+              !nextScores || !Number.isInteger(nextScores.X) || !Number.isInteger(nextScores.O)) {
+            setStatus("Received invalid game data. Please reconnect.", "bad");
+            return;
+          }
+          game = { ...nextGame, winningLine: Array.isArray(nextGame.winningLine) ? nextGame.winningLine : [] };
+          scores = { X: nextScores.X, O: nextScores.O };
+          render();
+          if (game.winner === "draw") setStatus("It's a draw! Play another round.", "good");
+          else if (game.winner) setStatus(`${game.winner} wins! Play another round.`, "good");
+          else setStatus(game.turn === myMark ? "Your turn." : "Friend's turn.");
+        }
+
+        function broadcastState() {
+          if (connection?.open) {
+            connection.send({ type: "state", game, scores });
+          }
+          render();
+          if (game.winner === "draw") setStatus("It's a draw! Play another round.", "good");
+          else if (game.winner) setStatus(`${game.winner} wins! Play another round.`, "good");
+          else setStatus(game.turn === myMark ? "Your turn." : "Friend's turn.");
+        }
+
+        function startRound() {
+          game = { board: Array(9).fill(""), turn: "X", winner: null, winningLine: [] };
+          broadcastState();
+        }
+
+        function handleMove(index, mark) {
+          if (game.winner || game.turn !== mark || !Number.isInteger(index) ||
+              index < 0 || index > 8 || game.board[index]) return;
+
+          game.board[index] = mark;
+          const winningLine = winningLines.find(line => line.every(cell => game.board[cell] === mark));
+          if (winningLine) {
+            game.winner = mark;
+            game.winningLine = winningLine;
+            scores[mark] += 1;
+          } else if (game.board.every(Boolean)) {
+            game.winner = "draw";
+          } else {
+            game.turn = mark === "X" ? "O" : "X";
+          }
+          broadcastState();
+        }
+
+        function handleMessage(message) {
+          if (!message || typeof message !== "object") return;
+          if (isHost && message.type === "move") {
+            handleMove(message.index, "O");
+          } else if (isHost && message.type === "restart") {
+            startRound();
+          } else if (!isHost && message.type === "state") {
+            receiveState(message.game, message.scores);
+          }
+        }
+
+        function attachConnection(nextConnection, host) {
+          connection = nextConnection;
+          isHost = host;
+          connection.on("open", () => {
+            hostButton.hidden = true;
+            restartButton.hidden = false;
+            leaveButton.hidden = false;
+            invite.classList.toggle("visible", isHost);
+            help.textContent = isHost
+              ? "You are X. Share the invite link above; your friend joins as O."
+              : "You joined as O. You can play when it is your turn.";
+            setStatus("Connected! X goes first.", "good");
+            if (isHost) broadcastState();
+            else render();
+          });
+          connection.on("data", handleMessage);
+          connection.on("close", () => {
+            connection = null;
+            render();
+            setStatus("Your friend disconnected. Create a new game to play again.", "bad");
+            restartButton.hidden = true;
+            leaveButton.hidden = true;
+          });
+          connection.on("error", error => {
+            console.error("Game connection error.", error);
+            setStatus("Connection interrupted. Check your internet and try again.", "bad");
+          });
+        }
+
+        function resetConnection() {
+          connection?.close();
+          peer?.destroy();
+          connection = null;
+          peer = null;
+          isHost = false;
+          myMark = null;
+          game = { board: Array(9).fill(""), turn: "X", winner: null, winningLine: [] };
+          scores = { X: 0, O: 0 };
+          invite.classList.remove("visible");
+          hostButton.hidden = false;
+          restartButton.hidden = true;
+          leaveButton.hidden = true;
+          help.textContent = "First publish this file on a public HTTPS site so your friend can open it. Then create a game and share its invite link. Both players need an internet connection.";
+          setStatus("Start a game or join a friend's invite.");
+          render();
+        }
+
+        function createGame() {
+          if (typeof Peer === "undefined") {
+            setStatus("Could not load the online game service. Check your connection and reload.", "bad");
+            return;
+          }
+          hostButton.disabled = true;
+          myMark = "X";
+          setStatus("Creating your invite link…");
+          peer = new Peer();
+          peer.on("open", id => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("room", id);
+            inviteLink.value = url.toString();
+            invite.classList.add("visible");
+            setStatus("Waiting for your friend to join…");
+            hostButton.disabled = false;
+          });
+          peer.on("connection", incoming => {
+            if (connection) {
+              incoming.close();
+              return;
+            }
+            attachConnection(incoming, true);
+          });
+          peer.on("error", error => {
+            console.error("Could not create or connect to a game.", error);
+            hostButton.disabled = false;
+            setStatus(error.type === "peer-unavailable"
+              ? "That invite is no longer available. Ask your friend to create a new game."
+              : "Could not reach the online game service. Please try again.", "bad");
+          });
+        }
+
+        function joinGame(roomId) {
+          if (typeof Peer === "undefined") {
+            setStatus("Could not load the online game service. Check your connection and reload.", "bad");
+            return;
+          }
+          hostButton.hidden = true;
+          hostButton.disabled = true;
+          leaveButton.hidden = false;
+          myMark = "O";
+          help.textContent = "Connecting to your friend's game…";
+          setStatus("Joining your friend…");
+          peer = new Peer();
+          peer.on("open", () => {
+            connection = peer.connect(roomId, { reliable: true });
+            attachConnection(connection, false);
+          });
+          peer.on("error", error => {
+            console.error("Could not join the game.", error);
+            if (error.type === "peer-unavailable") {
+              setStatus("Game not found. Ask your friend to create a new invite link.", "bad");
+            } else {
+              setStatus("Could not connect to the game. Check your internet and retry the invite.", "bad");
+            }
+            leaveButton.hidden = false;
+          });
+        }
+
+        cells.forEach(cell => {
+          cell.addEventListener("click", () => {
+            const index = Number(cell.dataset.index);
+            if (!connection?.open || game.turn !== myMark || game.winner || game.board[index]) return;
+            if (isHost) handleMove(index, "X");
+            else connection.send({ type: "move", index });
+          });
+        });
+
+        hostButton.addEventListener("click", createGame);
+        restartButton.addEventListener("click", () => {
+          if (!connection?.open) return;
+          if (isHost) startRound();
+          else connection.send({ type: "restart" });
+        });
+        leaveButton.addEventListener("click", () => {
+          history.replaceState(null, "", window.location.pathname + window.location.hash);
+          resetConnection();
+        });
+        copyButton.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(inviteLink.value);
+            copyButton.textContent = "Copied!";
+            window.setTimeout(() => { copyButton.textContent = "Copy link"; }, 1800);
+          } catch (error) {
+            console.error("Could not copy the invite link.", error);
+            inviteLink.select();
+            copyButton.textContent = "Select and copy";
+            setStatus("Automatic copy failed. Select the invite link and copy it manually.", "bad");
+          }
+        });
+        window.addEventListener("beforeunload", () => peer?.destroy());
+
+        const roomId = new URLSearchParams(window.location.search).get("room");
+        if (roomId) joinGame(roomId);
+        render();
+      })();
+    </script>
+  </body>
+</html>
